@@ -1,43 +1,74 @@
-# main.py
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+import requests
+from bs4 import BeautifulSoup
+import json
 
-# Improved UI Design
-# Features: 
-# - Enhanced styling with gradient backgrounds
-# - Glass-morphism effects
-# - Loading states implementation
-# - Professional stats display
-# - Responsive design
+app = FastAPI()
 
-import time
+# Configure static files for HTML/CSS/JS
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-class InstagramScraper:
-    def __init__(self):
-        self.data = None
+# FastAPI Route for Instagram scraping
+@app.get("/instagram/{username}")
+def scrape_instagram(username: str):
+    try:
+        url = f'https://www.instagram.com/{username}/'
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Instagram user not found.")
 
-    def fetch_data(self, username):
-        try:
-            # Alternative methods for scraping
-            # Method 1: Using API (if available)
-            # Method 2: Using a headless browser
-            pass
+        soup = BeautifulSoup(response.text, 'html.parser')
+        user_data = json.loads(soup.find('script', type='application/ld+json').string)
+        return user_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        except Exception as e:
-            print(f'Error occurred while fetching data: {str(e)}')
+# FastAPI Route for TikTok scraping
+@app.get("/tiktok/{username}")
+def scrape_tiktok(username: str):
+    try:
+        url = f'https://www.tiktok.com/@{username}'
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="TikTok user not found.")
 
-    def display_data(self):
-        # Implement comprehensive error handling
-        if self.data:
-            # Display data with comprehensive stats
-            pass
-        else:
-            print('No data available.')
+        soup = BeautifulSoup(response.text, 'html.parser')
+        user_data = soup.find('script', type='application/json').string
+        return json.loads(user_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# HTML/CSS for frontend
+html_content = '''<!DOCTYPE html>
+<html>
+<head>
+    <title>Social Info Scraper</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <h1>Social Info Scraper</h1>
+    <div class="container">
+        <h2>Instagram Info</h2>
+        <input type="text" id="instagram-username" placeholder="Enter Instagram username">
+        <button onclick="fetchInstagramInfo()">Fetch Instagram Info</button>
+        <div id="instagram-result"></div>
+
+        <h2>TikTok Info</h2>
+        <input type="text" id="tiktok-username" placeholder="Enter TikTok username">
+        <button onclick="fetchTikTokInfo()">Fetch TikTok Info</button>
+        <div id="tiktok-result"></div>
+    </div>
+    <script src="/static/scripts.js"></script>
+</body>
+</html>'''
+
+# Save HTML response
+@app.get("/")
+def get_home():
+    return HTMLResponse(content=html_content)
 
 if __name__ == '__main__':
-    loader = True  # Example loading state
-    while loader:
-        print('Loading...')
-        time.sleep(1)  # Just a placeholder for loading effect
-        loader = False  # Stop loading after some time
-    scraper = InstagramScraper()
-    scraper.fetch_data('example_username')
-    scraper.display_data()
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8000)
